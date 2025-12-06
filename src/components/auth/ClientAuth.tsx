@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ClientMeta } from '@/types/requira';
+import { useAuth } from '@/context/AuthContext';
 import { toast } from 'sonner';
 
 interface ClientAuthProps {
@@ -13,6 +14,7 @@ interface ClientAuthProps {
 }
 
 export const ClientAuth = ({ onSuccess, onBack }: ClientAuthProps) => {
+  const { signUp, signIn } = useAuth();
   const [isSignup, setIsSignup] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -33,21 +35,44 @@ export const ClientAuth = ({ onSuccess, onBack }: ClientAuthProps) => {
       return;
     }
 
+    if (password.length < 6) {
+      toast.error('Password must be at least 6 characters');
+      return;
+    }
+
     setIsProcessing(true);
 
-    // Simulate auth delay
-    await new Promise(resolve => setTimeout(resolve, 800));
+    try {
+      if (isSignup) {
+        const { error } = await signUp(email.trim(), password, name.trim(), company.trim());
+        if (error) {
+          toast.error(error);
+          setIsProcessing(false);
+          return;
+        }
+        toast.success('Account created successfully!');
+      } else {
+        const { error } = await signIn(email.trim(), password);
+        if (error) {
+          toast.error(error);
+          setIsProcessing(false);
+          return;
+        }
+        toast.success('Welcome back!');
+      }
 
-    // Demo mode: accept any credentials
-    const meta: ClientMeta = {
-      name: name.trim() || email.split('@')[0],
-      company: company.trim() || 'Demo Company',
-      email: email.trim(),
-    };
+      const meta: ClientMeta = {
+        name: name.trim() || email.split('@')[0],
+        company: company.trim() || '',
+        email: email.trim(),
+      };
 
-    toast.success(isSignup ? 'Account created successfully!' : 'Welcome back!');
-    onSuccess(meta);
-    setIsProcessing(false);
+      onSuccess(meta);
+    } catch (error) {
+      toast.error('Authentication failed. Please try again.');
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   return (
@@ -159,7 +184,7 @@ export const ClientAuth = ({ onSuccess, onBack }: ClientAuthProps) => {
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder={isSignup ? 'Create password' : 'Enter password'}
+                  placeholder={isSignup ? 'Create password (min 6 chars)' : 'Enter password'}
                   className="pl-10"
                   disabled={isProcessing}
                 />

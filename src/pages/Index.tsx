@@ -1,48 +1,39 @@
-import { useState } from 'react';
 import { AuthHandler } from '@/components/auth/AuthHandler';
 import { AdminDashboard } from '@/components/dashboard/AdminDashboard';
 import { ClientDashboard } from '@/components/dashboard/ClientDashboard';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
-import { ProjectProvider } from '@/context/ProjectContext';
-import { ClientMeta, DashboardType } from '@/types/requira';
+import { Loader2 } from 'lucide-react';
 
 const RequiraApp = () => {
-  const [currentDashboard, setCurrentDashboard] = useState<DashboardType>(null);
-  const [clientMeta, setClientMeta] = useState<ClientMeta | null>(null);
+  const { currentDashboard, clientMeta, login, logout, isLoading, user } = useAuth();
 
-  const handleLogin = (type: DashboardType, meta?: ClientMeta) => {
-    setCurrentDashboard(type);
-    if (meta) {
-      setClientMeta(meta);
-    }
-  };
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
-  const handleLogout = () => {
-    setCurrentDashboard(null);
-    setClientMeta(null);
-  };
-
-  if (!currentDashboard) {
-    return <AuthHandler onLogin={handleLogin} />;
+  if (!currentDashboard || !user) {
+    return <AuthHandler onLogin={login} />;
   }
 
   if (currentDashboard === 'admin') {
-    return <AdminDashboard onLogout={handleLogout} />;
+    return <AdminDashboard onLogout={logout} />;
   }
 
   if (currentDashboard === 'client' && clientMeta) {
-    return <ClientDashboard clientMeta={clientMeta} onLogout={handleLogout} />;
+    return <ClientDashboard clientMeta={clientMeta} onLogout={logout} />;
   }
 
-  return null;
+  return <AuthHandler onLogin={login} />;
 };
 
 const Index = () => {
   return (
     <AuthProvider>
-      <ProjectProvider>
-        <RequiraApp />
-      </ProjectProvider>
+      <RequiraApp />
     </AuthProvider>
   );
 };

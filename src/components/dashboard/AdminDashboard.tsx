@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/status-badge';
-import { useProjects } from '@/context/ProjectContext';
+import { useProjects } from '@/hooks/useProjects';
 import { Project, ProjectStatus } from '@/types/requira';
 
 interface AdminDashboardProps {

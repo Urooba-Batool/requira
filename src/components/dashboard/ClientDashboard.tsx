@@ -7,14 +7,14 @@ import {
   Check,
   Clock,
   AlertTriangle,
-  Sparkles
+  Sparkles,
+  Loader2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { StatusBadge } from '@/components/ui/status-badge';
 import { RequirementChat } from './RequirementChat';
-import { useProjects } from '@/context/ProjectContext';
+import { useProjects } from '@/hooks/useProjects';
 import { useAuth } from '@/context/AuthContext';
-import { ClientMeta, Project, ProjectStatus } from '@/types/requira';
+import { ClientMeta, ProjectStatus } from '@/types/requira';
 
 interface ClientDashboardProps {
   clientMeta: ClientMeta;
@@ -39,9 +39,10 @@ const getStatusInfo = (status: ProjectStatus) => {
 };
 
 export const ClientDashboard = ({ clientMeta, onLogout }: ClientDashboardProps) => {
-  const { projects, addProject } = useProjects();
+  const { projects, isLoading, addProject, updateProjectRequirements, updateProjectStatus } = useProjects();
   const { userId } = useAuth();
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
+  const [isCreating, setIsCreating] = useState(false);
 
   // Filter projects for this client
   const clientProjects = useMemo(() => 
@@ -60,19 +61,31 @@ export const ClientDashboard = ({ clientMeta, onLogout }: ClientDashboardProps) 
 
   const activeProject = clientProjects.find(p => p.id === activeProjectId);
 
-  const handleNewProject = () => {
-    const newProject = addProject({
+  const handleNewProject = async () => {
+    setIsCreating(true);
+    const newProject = await addProject({
       clientName: clientMeta.name,
       companyName: clientMeta.company,
-      clientId: userId,
+      clientId: userId!,
       status: "incomplete requirements",
       projectTitle: "New Project Request",
       projectDescription: "",
       requirements: {},
       history: [],
     });
-    setActiveProjectId(newProject.id);
+    if (newProject) {
+      setActiveProjectId(newProject.id);
+    }
+    setIsCreating(false);
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex bg-background">
@@ -97,8 +110,16 @@ export const ClientDashboard = ({ clientMeta, onLogout }: ClientDashboardProps) 
 
         {/* New Project Button */}
         <div className="p-4">
-          <Button onClick={handleNewProject} className="w-full gradient-secondary text-secondary-foreground">
-            <Plus className="w-4 h-4 mr-2" />
+          <Button 
+            onClick={handleNewProject} 
+            className="w-full gradient-secondary text-secondary-foreground"
+            disabled={isCreating}
+          >
+            {isCreating ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <Plus className="w-4 h-4 mr-2" />
+            )}
             New Project Request
           </Button>
         </div>
@@ -151,7 +172,12 @@ export const ClientDashboard = ({ clientMeta, onLogout }: ClientDashboardProps) 
       {/* Main Content */}
       <div className="flex-1 p-6">
         {activeProject ? (
-          <RequirementChat project={activeProject} clientName={clientMeta.name} />
+          <RequirementChat 
+            project={activeProject} 
+            clientName={clientMeta.name}
+            onUpdateRequirements={updateProjectRequirements}
+            onUpdateStatus={updateProjectStatus}
+          />
         ) : (
           <div className="flex flex-col items-center justify-center h-full">
             <div className="p-4 gradient-primary rounded-2xl mb-6">
@@ -163,8 +189,16 @@ export const ClientDashboard = ({ clientMeta, onLogout }: ClientDashboardProps) 
             <p className="text-muted-foreground text-center max-w-md">
               Start a new project request to begin gathering your software requirements with our AI assistant.
             </p>
-            <Button onClick={handleNewProject} className="mt-6 gradient-secondary text-secondary-foreground">
-              <Plus className="w-4 h-4 mr-2" />
+            <Button 
+              onClick={handleNewProject} 
+              className="mt-6 gradient-secondary text-secondary-foreground"
+              disabled={isCreating}
+            >
+              {isCreating ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Plus className="w-4 h-4 mr-2" />
+              )}
               Start New Request
             </Button>
           </div>
