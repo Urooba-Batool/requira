@@ -2,3 +2,6 @@ project_id = "eqvvvshjixdkekodxwnk"
 
 [functions.requirement-chat]
 verify_jwt = true
+
+[functions.requirement-critique]
+verify_jwt = true
