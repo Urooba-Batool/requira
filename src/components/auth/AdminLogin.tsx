@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import { ArrowLeft, Lock, Shield } from 'lucide-react';
+import { ArrowLeft, Lock, Shield, Mail, Loader2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-
-const ADMIN_PASSWORD = "uroobasre";
+import { useAuth } from '@/context/AuthContext';
+import { toast } from 'sonner';
 
 interface AdminLoginProps {
   onSuccess: () => void;
@@ -13,17 +13,47 @@ interface AdminLoginProps {
 }
 
 export const AdminLogin = ({ onSuccess, onBack }: AdminLoginProps) => {
+  const { signIn, checkAdminRole } = useAuth();
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    if (!email.trim() || !password.trim()) {
+      setError('Please enter email and password');
+      return;
+    }
     
-    if (password === ADMIN_PASSWORD) {
+    setIsProcessing(true);
+
+    try {
+      const { error: signInError } = await signIn(email.trim(), password);
+      
+      if (signInError) {
+        setError(signInError);
+        setIsProcessing(false);
+        return;
+      }
+
+      // Check if user has admin role
+      const isAdmin = await checkAdminRole();
+      
+      if (!isAdmin) {
+        setError('You do not have admin privileges');
+        setIsProcessing(false);
+        return;
+      }
+
+      toast.success('Welcome, Admin!');
       onSuccess();
-    } else {
-      setError('Invalid admin password');
+    } catch (err) {
+      setError('Authentication failed. Please try again.');
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -56,16 +86,33 @@ export const AdminLogin = ({ onSuccess, onBack }: AdminLoginProps) => {
 
           <form onSubmit={handleLogin} className="space-y-6">
             <div className="space-y-2">
-              <Label htmlFor="password">Admin Password</Label>
+              <Label htmlFor="adminEmail">Email Address</Label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  id="adminEmail"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="admin@company.com"
+                  className="pl-10"
+                  disabled={isProcessing}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="adminPassword">Password</Label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
-                  id="password"
+                  id="adminPassword"
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Enter password"
                   className="pl-10"
+                  disabled={isProcessing}
                 />
               </div>
             </div>
@@ -74,8 +121,16 @@ export const AdminLogin = ({ onSuccess, onBack }: AdminLoginProps) => {
               <p className="text-sm text-destructive text-center">{error}</p>
             )}
 
-            <Button type="submit" className="w-full gradient-primary text-primary-foreground">
-              <Lock className="w-4 h-4 mr-2" />
+            <Button 
+              type="submit" 
+              className="w-full gradient-primary text-primary-foreground"
+              disabled={isProcessing}
+            >
+              {isProcessing ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Lock className="w-4 h-4 mr-2" />
+              )}
               Log In
             </Button>
           </form>

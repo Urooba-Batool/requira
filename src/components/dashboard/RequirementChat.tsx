@@ -1,14 +1,15 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Send, Check, Loader2, Sparkles, Bot, User } from 'lucide-react';
+import { Send, Check, Loader2, Bot, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Project, ChatMessage, Requirements } from '@/types/requira';
-import { useProjects } from '@/context/ProjectContext';
+import { Project, ChatMessage, Requirements, ProjectStatus } from '@/types/requira';
 
 interface RequirementChatProps {
   project: Project;
   clientName: string;
+  onUpdateRequirements: (id: string, requirements: Requirements, history: ChatMessage[]) => Promise<void>;
+  onUpdateStatus: (id: string, status: ProjectStatus) => Promise<void>;
 }
 
 // Simulated AI responses for demo
@@ -21,8 +22,7 @@ const AI_RESPONSES = [
   "Excellent progress! Based on our discussion, I believe we have gathered comprehensive requirements. Would you like to review and submit them?",
 ];
 
-export const RequirementChat = ({ project, clientName }: RequirementChatProps) => {
-  const { updateProjectRequirements, updateProjectStatus } = useProjects();
+export const RequirementChat = ({ project, clientName, onUpdateRequirements, onUpdateStatus }: RequirementChatProps) => {
   const [message, setMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [history, setHistory] = useState<ChatMessage[]>(project.history);
@@ -36,16 +36,24 @@ export const RequirementChat = ({ project, clientName }: RequirementChatProps) =
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [history]);
 
+  // Sync with project prop changes
+  useEffect(() => {
+    setHistory(project.history);
+    setRequirements(project.requirements);
+  }, [project.id, project.history, project.requirements]);
+
   // Initialize chat with welcome message if empty
   useEffect(() => {
-    if (history.length === 0) {
+    if (history.length === 0 && isChatActive) {
       const initialMessage: ChatMessage = {
         role: 'assistant',
         text: `Hello ${clientName}! I'm Requira, your AI requirements assistant. Let's gather the details for your project "${project.projectTitle}". What is the main goal or purpose of this project?`
       };
-      setHistory([initialMessage]);
+      const newHistory = [initialMessage];
+      setHistory(newHistory);
+      onUpdateRequirements(project.id, requirements, newHistory);
     }
-  }, []);
+  }, [project.id]);
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -89,13 +97,13 @@ export const RequirementChat = ({ project, clientName }: RequirementChatProps) =
       setIsReadyToSubmit(true);
     }
 
-    // Save to context
-    updateProjectRequirements(project.id, newRequirements, finalHistory);
+    // Save to database
+    await onUpdateRequirements(project.id, newRequirements, finalHistory);
     setIsLoading(false);
   };
 
-  const handleSubmit = () => {
-    updateProjectStatus(project.id, 'under review');
+  const handleSubmit = async () => {
+    await onUpdateStatus(project.id, 'under review');
   };
 
   return (
