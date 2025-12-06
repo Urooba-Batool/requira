@@ -4,6 +4,8 @@ import { Send, Check, Loader2, Bot, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Project, ChatMessage, Requirements, ProjectStatus } from '@/types/requira';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 interface RequirementChatProps {
   project: Project;
@@ -12,16 +14,6 @@ interface RequirementChatProps {
   onUpdateStatus: (id: string, status: ProjectStatus) => Promise<void>;
 }
 
-// Simulated AI responses for demo
-const AI_RESPONSES = [
-  "Great! Now, who are the primary users of this system? Please describe their roles and what they'll need to accomplish.",
-  "That's helpful! What are your main performance requirements? Consider load times, concurrent users, and response times.",
-  "Understood. Are there any specific security or compliance requirements we need to consider? (e.g., GDPR, HIPAA, data encryption)",
-  "Perfect! What integrations with external systems or services will be needed?",
-  "Now let's discuss the constraints. Are there any technologies, approaches, or features that should be explicitly excluded?",
-  "Excellent progress! Based on our discussion, I believe we have gathered comprehensive requirements. Would you like to review and submit them?",
-];
-
 export const RequirementChat = ({ project, clientName, onUpdateRequirements, onUpdateStatus }: RequirementChatProps) => {
   const [message, setMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -29,6 +21,7 @@ export const RequirementChat = ({ project, clientName, onUpdateRequirements, onU
   const [isReadyToSubmit, setIsReadyToSubmit] = useState(false);
   const [requirements, setRequirements] = useState<Requirements>(project.requirements);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const { toast } = useToast();
 
   const isChatActive = project.status === 'incomplete requirements';
 
@@ -45,15 +38,45 @@ export const RequirementChat = ({ project, clientName, onUpdateRequirements, onU
   // Initialize chat with welcome message if empty
   useEffect(() => {
     if (history.length === 0 && isChatActive) {
+      initializeChat();
+    }
+  }, [project.id]);
+
+  const initializeChat = async () => {
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('requirement-chat', {
+        body: {
+          messages: [],
+          projectTitle: project.projectTitle,
+          clientName
+        }
+      });
+
+      if (error) throw error;
+
+      const initialMessage: ChatMessage = {
+        role: 'assistant',
+        text: data.response || `Hello ${clientName}! I'm Requira, your AI requirements assistant. Let's gather the details for your project "${project.projectTitle}". What is the main goal or purpose of this project?`
+      };
+      
+      const newHistory = [initialMessage];
+      setHistory(newHistory);
+      await onUpdateRequirements(project.id, requirements, newHistory);
+    } catch (error) {
+      console.error('Error initializing chat:', error);
+      // Fallback to default message
       const initialMessage: ChatMessage = {
         role: 'assistant',
         text: `Hello ${clientName}! I'm Requira, your AI requirements assistant. Let's gather the details for your project "${project.projectTitle}". What is the main goal or purpose of this project?`
       };
       const newHistory = [initialMessage];
       setHistory(newHistory);
-      onUpdateRequirements(project.id, requirements, newHistory);
+      await onUpdateRequirements(project.id, requirements, newHistory);
+    } finally {
+      setIsLoading(false);
     }
-  }, [project.id]);
+  };
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -65,41 +88,77 @@ export const RequirementChat = ({ project, clientName, onUpdateRequirements, onU
     setMessage('');
     setIsLoading(true);
 
-    // Simulate AI processing
-    await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 1000));
+    try {
+      const { data, error } = await supabase.functions.invoke('requirement-chat', {
+        body: {
+          messages: newHistory,
+          projectTitle: project.projectTitle,
+          clientName
+        }
+      });
 
-    // Get next AI response
-    const responseIndex = Math.min(
-      Math.floor((newHistory.filter(m => m.role === 'user').length - 1)),
-      AI_RESPONSES.length - 1
-    );
-    
-    const assistantMessage: ChatMessage = {
-      role: 'assistant',
-      text: AI_RESPONSES[responseIndex]
-    };
+      if (error) {
+        throw error;
+      }
 
-    const finalHistory = [...newHistory, assistantMessage];
-    setHistory(finalHistory);
+      const assistantMessage: ChatMessage = {
+        role: 'assistant',
+        text: data.response
+      };
 
-    // Update requirements based on conversation progress
-    const userMessages = finalHistory.filter(m => m.role === 'user').map(m => m.text);
-    const newRequirements: Requirements = {
-      functional: userMessages[0] || '',
-      nonFunctional: userMessages[1] || '',
-      domain: userMessages[2] || '',
-      inverse: userMessages[3] || '',
-    };
-    setRequirements(newRequirements);
-    
-    // Check if ready to submit (after 4+ user responses)
-    if (userMessages.length >= 4) {
-      setIsReadyToSubmit(true);
+      const finalHistory = [...newHistory, assistantMessage];
+      setHistory(finalHistory);
+
+      // Check if AI says requirements are complete
+      if (data.isComplete) {
+        setIsReadyToSubmit(true);
+      }
+
+      // Extract requirements from conversation (simple approach - can be enhanced)
+      const userMessages = finalHistory.filter(m => m.role === 'user').map(m => m.text);
+      const newRequirements: Requirements = {
+        functional: userMessages.slice(0, 2).join('\n\n') || '',
+        nonFunctional: userMessages.slice(2, 4).join('\n\n') || '',
+        domain: userMessages.slice(4, 6).join('\n\n') || '',
+        inverse: userMessages.slice(6).join('\n\n') || '',
+      };
+      setRequirements(newRequirements);
+
+      // Also allow manual submit after 4+ responses
+      if (userMessages.length >= 4) {
+        setIsReadyToSubmit(true);
+      }
+
+      await onUpdateRequirements(project.id, newRequirements, finalHistory);
+    } catch (error: any) {
+      console.error('Error sending message:', error);
+      
+      // Handle specific error cases
+      if (error.message?.includes('429') || error.status === 429) {
+        toast({
+          title: "Rate Limited",
+          description: "Too many requests. Please wait a moment and try again.",
+          variant: "destructive"
+        });
+      } else if (error.message?.includes('402') || error.status === 402) {
+        toast({
+          title: "Credits Exhausted",
+          description: "AI credits have been exhausted. Please add more credits.",
+          variant: "destructive"
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to get AI response. Please try again.",
+          variant: "destructive"
+        });
+      }
+
+      // Remove the user message on error
+      setHistory(history);
+    } finally {
+      setIsLoading(false);
     }
-
-    // Save to database
-    await onUpdateRequirements(project.id, newRequirements, finalHistory);
-    setIsLoading(false);
   };
 
   const handleSubmit = async () => {

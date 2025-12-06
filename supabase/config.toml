@@ -1,1 +1,4 @@
 project_id = "eqvvvshjixdkekodxwnk"
+
+[functions.requirement-chat]
+verify_jwt = true
