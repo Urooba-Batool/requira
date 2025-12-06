@@ -20,6 +20,8 @@ import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { useProjects } from '@/hooks/useProjects';
 import { Project, ProjectStatus } from '@/types/requira';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 interface AdminDashboardProps {
   onLogout: () => void;
@@ -38,6 +40,7 @@ export const AdminDashboard = ({ onLogout }: AdminDashboardProps) => {
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [critiqueResult, setCritiqueResult] = useState('');
   const [isCritiqueLoading, setIsCritiqueLoading] = useState(false);
+  const { toast } = useToast();
 
   const stats = useMemo(() => [
     { name: "Total Projects", count: projects.length, icon: Briefcase, color: "text-info" },
@@ -53,29 +56,44 @@ export const AdminDashboard = ({ onLogout }: AdminDashboardProps) => {
     setIsCritiqueLoading(true);
     setCritiqueResult('');
     
-    // Simulate AI critique
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    const reqs = selectedProject.requirements;
-    setCritiqueResult(`## Requirements Analysis for "${selectedProject.projectTitle}"
+    try {
+      const { data, error } = await supabase.functions.invoke('requirement-critique', {
+        body: {
+          projectTitle: selectedProject.projectTitle,
+          requirements: selectedProject.requirements
+        }
+      });
 
-### Completeness Assessment
-- **Functional Requirements**: ${reqs.functional ? '✅ Documented' : '⚠️ Missing'}
-- **Non-Functional Requirements**: ${reqs.nonFunctional ? '✅ Documented' : '⚠️ Missing'}
-- **Domain Requirements**: ${reqs.domain ? '✅ Documented' : '⚠️ Missing'}
-- **Constraints/Inverse**: ${reqs.inverse ? '✅ Documented' : '⚠️ Missing'}
+      if (error) {
+        throw error;
+      }
 
-### Recommendations
-1. Consider adding more specific acceptance criteria
-2. Include performance benchmarks where applicable
-3. Define integration points with external systems
-4. Add user story format for functional requirements
-
-### Risk Areas
-- Ensure all stakeholders have reviewed requirements
-- Validate non-functional requirements are measurable`);
-    
-    setIsCritiqueLoading(false);
+      setCritiqueResult(data.critique);
+    } catch (error: any) {
+      console.error('Error generating critique:', error);
+      
+      if (error.message?.includes('429') || error.status === 429) {
+        toast({
+          title: "Rate Limited",
+          description: "Too many requests. Please wait a moment and try again.",
+          variant: "destructive"
+        });
+      } else if (error.message?.includes('402') || error.status === 402) {
+        toast({
+          title: "Credits Exhausted",
+          description: "AI credits have been exhausted. Please add more credits.",
+          variant: "destructive"
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to analyze requirements. Please try again.",
+          variant: "destructive"
+        });
+      }
+    } finally {
+      setIsCritiqueLoading(false);
+    }
   };
 
   const handleStatusChange = (projectId: string, newStatus: ProjectStatus) => {
