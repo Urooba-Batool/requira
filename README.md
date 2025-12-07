@@ -30,8 +30,8 @@
 
 **Example Chatbot Interaction:**
 
-![Chatbot Example](./screenshots/client_session_inprogress.png)
-![Chatbot Example](./screenshots/client_session_ended.png)
+![Chatbot Example](public/screenshots/client_session_inprogress.png)
+![Chatbot Example](public/screenshots/client_session_ended.png)
 
 ---
 
@@ -44,15 +44,15 @@
 
 **Admin Dashboard View:**
 
-![Admin Dashboard](./screenshots/admin_dashboard_overview.png)
+![Admin Dashboard](public/screenshots/admin_dashboard_overview.png)
 
 **Project Requirement Tab:**
 
-![Project Requirements](./screenshots/admin_dashboard_project_details.png)
+![Project Requirements](public/screenshots/admin_dashboard_project_details.png)
 
 **Requirement Analyzer Preview:**
 
-![PDF Export](./screenshots/analyzer_view.png)
+![PDF Export](public/screenshots/analyzer_view.png)
 
 ---
 
@@ -106,10 +106,10 @@ Try Requira here: [https://requira.lovable.app/](https://requira.lovable.app/)
 
 ## 📸 Screenshots
 
-- **Client Chatbot Interaction:** `./screenshots/client_session_inprogress.png`
-- **Admin Dashboard:** `./screenshots/admin_dashboard_overview.png`
-- **Project Requirements Tab:** `./screenshots/admin_dashboard_project_details.png`
-- **Requirement Analyzer:** `./screenshots/analyzer_view.png`
+- **Client Chatbot Interaction:** `public/screenshots/client_session_inprogress.png`
+- **Admin Dashboard:** `public/screenshots/admin_dashboard_overview.png`
+- **Project Requirements Tab:** `public/screenshots/admin_dashboard_project_details.png`
+- **Requirement Analyzer:** `public/screenshots/analyzer_view.png`
 
 
 ---
