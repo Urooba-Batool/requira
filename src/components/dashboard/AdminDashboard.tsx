@@ -40,6 +40,7 @@ export const AdminDashboard = ({ onLogout }: AdminDashboardProps) => {
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [critiqueResult, setCritiqueResult] = useState('');
   const [isCritiqueLoading, setIsCritiqueLoading] = useState(false);
+  const [isExportLoading, setIsExportLoading] = useState(false);
   const { toast } = useToast();
 
   const stats = useMemo(() => [
@@ -110,7 +111,39 @@ export const AdminDashboard = ({ onLogout }: AdminDashboardProps) => {
     { key: 'inverse', title: 'Constraints', icon: AlertTriangle },
   ];
 
-  const exportToPDF = (project: Project) => {
+  interface SRSData {
+    introduction: {
+      purpose: string;
+      scope: string;
+    };
+    overallDescription: {
+      productPerspective: string;
+      userCharacteristics: string;
+    };
+    systemFeatures: Array<{
+      title: string;
+      description: string;
+      inputs: string;
+      outputs: string;
+      behavior: string;
+    }>;
+    nonFunctionalRequirements: {
+      performance: string[];
+      security: string[];
+      usability: string[];
+      reliability: string[];
+      other: string[];
+    };
+    externalInterfaces: {
+      userInterface: string;
+      hardware: string;
+      software: string;
+      communication: string;
+    };
+    constraints: string[];
+  }
+
+  const generatePDFFromSRS = (project: Project, srsData: SRSData) => {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
@@ -118,7 +151,6 @@ export const AdminDashboard = ({ onLogout }: AdminDashboardProps) => {
     const maxWidth = pageWidth - margin * 2;
     let yPos = 20;
 
-    // Helper to add text with word wrap and check for page break
     const addWrappedText = (text: string, y: number, fontSize: number = 11): number => {
       doc.setFontSize(fontSize);
       const lines = doc.splitTextToSize(text, maxWidth);
@@ -136,7 +168,6 @@ export const AdminDashboard = ({ onLogout }: AdminDashboardProps) => {
       return y + 5;
     };
 
-    // Helper to check and add new page if needed
     const checkPageBreak = (requiredSpace: number): number => {
       if (yPos + requiredSpace > pageHeight - 30) {
         doc.addPage();
@@ -145,7 +176,6 @@ export const AdminDashboard = ({ onLogout }: AdminDashboardProps) => {
       return yPos;
     };
 
-    // Helper to add section header
     const addSectionHeader = (number: string, title: string, isSubsection: boolean = false): number => {
       yPos = checkPageBreak(15);
       const fontSize = isSubsection ? 12 : 14;
@@ -156,31 +186,32 @@ export const AdminDashboard = ({ onLogout }: AdminDashboardProps) => {
       return yPos + (isSubsection ? 8 : 10);
     };
 
-    // Helper to add section content
-    const addSectionContent = (content: string): number => {
+    const addBulletList = (items: string[]): number => {
       doc.setFontSize(11);
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(60, 60, 60);
-      return addWrappedText(content || 'Not specified.', yPos);
+      items.forEach(item => {
+        if (item && item.trim()) {
+          yPos = addWrappedText(`• ${item}`, yPos);
+        }
+      });
+      return yPos;
     };
 
     // ===== TITLE PAGE =====
     doc.setFillColor(79, 70, 229);
     doc.rect(0, 0, pageWidth, pageHeight, 'F');
     
-    // Title
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(28);
     doc.setFont('helvetica', 'bold');
     doc.text('Software Requirements', pageWidth / 2, pageHeight / 2 - 30, { align: 'center' });
     doc.text('Specification (SRS)', pageWidth / 2, pageHeight / 2 - 10, { align: 'center' });
     
-    // Project Title
     doc.setFontSize(18);
     doc.setFont('helvetica', 'normal');
     doc.text(project.projectTitle, pageWidth / 2, pageHeight / 2 + 20, { align: 'center' });
     
-    // Metadata
     doc.setFontSize(12);
     doc.text(`Client: ${project.clientName}`, pageWidth / 2, pageHeight / 2 + 45, { align: 'center' });
     doc.text(`Company: ${project.companyName}`, pageWidth / 2, pageHeight / 2 + 57, { align: 'center' });
@@ -201,162 +232,192 @@ export const AdminDashboard = ({ onLogout }: AdminDashboardProps) => {
     );
     yPos += 5;
 
-    // 1.1 Purpose
     yPos = addSectionHeader('1.1', 'Purpose', true);
-    yPos = addWrappedText(
-      `The purpose of this document is to outline the functional and non-functional requirements for ${project.projectTitle}. ${project.projectDescription || ''}`,
-      yPos
-    );
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(60, 60, 60);
+    yPos = addWrappedText(srsData.introduction.purpose, yPos);
     yPos += 5;
 
-    // 1.2 Scope
     yPos = addSectionHeader('1.2', 'Scope', true);
-    yPos = addWrappedText(
-      `This system will allow users to perform essential tasks as defined by ${project.companyName}. The requirements documented herein are based on client discussions and stakeholder input.`,
-      yPos
-    );
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(60, 60, 60);
+    yPos = addWrappedText(srsData.introduction.scope, yPos);
     yPos += 10;
 
     // ===== SECTION 2: OVERALL DESCRIPTION =====
     yPos = checkPageBreak(40);
     yPos = addSectionHeader('2.', 'Overall Description');
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(60, 60, 60);
     yPos = addWrappedText(
       'This section describes the product\'s perspective, major functions, users, and general constraints.',
       yPos
     );
     yPos += 5;
 
-    // 2.1 Product Perspective
     yPos = addSectionHeader('2.1', 'Product Perspective', true);
-    const domainContent = project.requirements.domain || 'The product operates as a standalone system designed to meet the specific needs outlined by the client.';
-    yPos = addWrappedText(domainContent, yPos);
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(60, 60, 60);
+    yPos = addWrappedText(srsData.overallDescription.productPerspective, yPos);
     yPos += 5;
 
-    // 2.2 User Characteristics
     yPos = addSectionHeader('2.2', 'User Characteristics', true);
-    yPos = addWrappedText(
-      'Users of this system are expected to have varying levels of technical expertise. The system should be designed with usability in mind to accommodate all user types.',
-      yPos
-    );
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(60, 60, 60);
+    yPos = addWrappedText(srsData.overallDescription.userCharacteristics, yPos);
     yPos += 10;
 
-    // ===== SECTION 3: SYSTEM FEATURES (FUNCTIONAL REQUIREMENTS) =====
+    // ===== SECTION 3: SYSTEM FEATURES =====
     yPos = checkPageBreak(40);
     yPos = addSectionHeader('3.', 'System Features');
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(60, 60, 60);
     yPos = addWrappedText(
-      'This section outlines the key functional features of the system based on client requirements.',
+      'This section outlines the key functional features of the system.',
       yPos
     );
     yPos += 5;
 
-    // Parse functional requirements and display them
-    const functionalReqs = project.requirements.functional || 'No functional requirements have been specified.';
-    const funcLines = functionalReqs.split('\n').filter((line: string) => line.trim());
-    
-    if (funcLines.length > 0) {
-      funcLines.forEach((line: string, index: number) => {
-        yPos = checkPageBreak(20);
-        yPos = addSectionHeader(`3.${index + 1}`, `Feature ${index + 1}`, true);
-        yPos = addWrappedText(line.replace(/^[-•*]\s*/, ''), yPos);
-        yPos += 3;
-      });
-    } else {
-      yPos = addSectionContent(functionalReqs);
-    }
-    yPos += 10;
+    srsData.systemFeatures.forEach((feature, index) => {
+      yPos = checkPageBreak(30);
+      yPos = addSectionHeader(`3.${index + 1}`, feature.title, true);
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(60, 60, 60);
+      yPos = addWrappedText(feature.description, yPos);
+      
+      if (feature.inputs && feature.inputs !== 'Not specified' && feature.inputs !== 'To be determined') {
+        yPos = addWrappedText(`Inputs: ${feature.inputs}`, yPos);
+      }
+      if (feature.outputs && feature.outputs !== 'Not specified' && feature.outputs !== 'To be determined') {
+        yPos = addWrappedText(`Outputs: ${feature.outputs}`, yPos);
+      }
+      if (feature.behavior && feature.behavior !== 'Not specified' && feature.behavior !== 'To be determined') {
+        yPos = addWrappedText(`Behavior: ${feature.behavior}`, yPos);
+      }
+      yPos += 5;
+    });
+    yPos += 5;
 
     // ===== SECTION 4: NON-FUNCTIONAL REQUIREMENTS =====
     yPos = checkPageBreak(40);
     yPos = addSectionHeader('4.', 'Non-Functional Requirements');
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(60, 60, 60);
     yPos = addWrappedText(
       'Requirements regarding performance, security, usability, reliability, and other quality attributes.',
       yPos
     );
     yPos += 5;
 
-    // Parse non-functional requirements
-    const nonFuncReqs = project.requirements.nonFunctional || 'No non-functional requirements have been specified.';
-    const nonFuncLines = nonFuncReqs.split('\n').filter((line: string) => line.trim());
-
-    const nfCategories = [
-      { title: 'Performance Requirements', keywords: ['performance', 'speed', 'response', 'load', 'fast'] },
-      { title: 'Security Requirements', keywords: ['security', 'auth', 'password', 'encrypt', 'protect', 'access'] },
-      { title: 'Usability Requirements', keywords: ['usability', 'user-friendly', 'intuitive', 'easy', 'simple'] },
-      { title: 'Reliability Requirements', keywords: ['reliable', 'uptime', 'availability', 'backup', 'recovery'] }
-    ];
-
-    let categorizedLines: { [key: string]: string[] } = {};
-    let uncategorized: string[] = [];
-
-    nonFuncLines.forEach((line: string) => {
-      const lowerLine = line.toLowerCase();
-      let matched = false;
-      for (const cat of nfCategories) {
-        if (cat.keywords.some(kw => lowerLine.includes(kw))) {
-          if (!categorizedLines[cat.title]) categorizedLines[cat.title] = [];
-          categorizedLines[cat.title].push(line.replace(/^[-•*]\s*/, ''));
-          matched = true;
-          break;
-        }
-      }
-      if (!matched) {
-        uncategorized.push(line.replace(/^[-•*]\s*/, ''));
-      }
-    });
-
-    let nfSubIndex = 1;
-    Object.entries(categorizedLines).forEach(([category, lines]) => {
-      yPos = checkPageBreak(20);
-      yPos = addSectionHeader(`4.${nfSubIndex}`, category, true);
-      lines.forEach(line => {
-        yPos = addWrappedText(`• ${line}`, yPos);
-      });
+    let nfIndex = 1;
+    
+    if (srsData.nonFunctionalRequirements.performance?.length > 0) {
+      yPos = addSectionHeader(`4.${nfIndex}`, 'Performance Requirements', true);
+      yPos = addBulletList(srsData.nonFunctionalRequirements.performance);
       yPos += 3;
-      nfSubIndex++;
-    });
-
-    if (uncategorized.length > 0) {
-      yPos = checkPageBreak(20);
-      yPos = addSectionHeader(`4.${nfSubIndex}`, 'Other Non-Functional Requirements', true);
-      uncategorized.forEach(line => {
-        yPos = addWrappedText(`• ${line}`, yPos);
-      });
-      yPos += 3;
+      nfIndex++;
     }
 
-    if (nonFuncLines.length === 0) {
-      yPos = addSectionContent(nonFuncReqs);
+    if (srsData.nonFunctionalRequirements.security?.length > 0) {
+      yPos = addSectionHeader(`4.${nfIndex}`, 'Security Requirements', true);
+      yPos = addBulletList(srsData.nonFunctionalRequirements.security);
+      yPos += 3;
+      nfIndex++;
     }
-    yPos += 10;
+
+    if (srsData.nonFunctionalRequirements.usability?.length > 0) {
+      yPos = addSectionHeader(`4.${nfIndex}`, 'Usability Requirements', true);
+      yPos = addBulletList(srsData.nonFunctionalRequirements.usability);
+      yPos += 3;
+      nfIndex++;
+    }
+
+    if (srsData.nonFunctionalRequirements.reliability?.length > 0) {
+      yPos = addSectionHeader(`4.${nfIndex}`, 'Reliability Requirements', true);
+      yPos = addBulletList(srsData.nonFunctionalRequirements.reliability);
+      yPos += 3;
+      nfIndex++;
+    }
+
+    if (srsData.nonFunctionalRequirements.other?.length > 0) {
+      yPos = addSectionHeader(`4.${nfIndex}`, 'Other Requirements', true);
+      yPos = addBulletList(srsData.nonFunctionalRequirements.other);
+      yPos += 3;
+    }
+    yPos += 5;
 
     // ===== SECTION 5: EXTERNAL INTERFACE REQUIREMENTS =====
     yPos = checkPageBreak(40);
     yPos = addSectionHeader('5.', 'External Interface Requirements');
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(60, 60, 60);
     yPos = addWrappedText(
-      'Details about user interface, hardware, software, and communication interfaces required by the system.',
+      'Details about user interface, hardware, software, and communication interfaces.',
       yPos
     );
     yPos += 5;
 
-    // Extract interface-related requirements from domain if available
-    yPos = addSectionHeader('5.1', 'User Interface Requirements', true);
-    yPos = addWrappedText(
-      'The system shall provide an intuitive user interface that adheres to modern design principles and accessibility standards.',
-      yPos
-    );
-    yPos += 10;
+    yPos = addSectionHeader('5.1', 'User Interface', true);
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(60, 60, 60);
+    yPos = addWrappedText(srsData.externalInterfaces.userInterface, yPos);
+    yPos += 3;
 
-    // ===== SECTION 6: CONSTRAINTS & OTHER REQUIREMENTS =====
+    if (srsData.externalInterfaces.hardware && srsData.externalInterfaces.hardware !== 'To be determined') {
+      yPos = addSectionHeader('5.2', 'Hardware Interfaces', true);
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(60, 60, 60);
+      yPos = addWrappedText(srsData.externalInterfaces.hardware, yPos);
+      yPos += 3;
+    }
+
+    if (srsData.externalInterfaces.software && srsData.externalInterfaces.software !== 'To be determined') {
+      yPos = addSectionHeader('5.3', 'Software Interfaces', true);
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(60, 60, 60);
+      yPos = addWrappedText(srsData.externalInterfaces.software, yPos);
+      yPos += 3;
+    }
+
+    if (srsData.externalInterfaces.communication && srsData.externalInterfaces.communication !== 'To be determined') {
+      yPos = addSectionHeader('5.4', 'Communication Interfaces', true);
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(60, 60, 60);
+      yPos = addWrappedText(srsData.externalInterfaces.communication, yPos);
+      yPos += 3;
+    }
+    yPos += 5;
+
+    // ===== SECTION 6: CONSTRAINTS =====
     yPos = checkPageBreak(40);
     yPos = addSectionHeader('6.', 'Constraints & Other Requirements');
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(60, 60, 60);
     yPos = addWrappedText(
-      'This section documents any additional constraints, exclusions, or specifications for the project.',
+      'This section documents any additional constraints, exclusions, or specifications.',
       yPos
     );
     yPos += 5;
 
-    const constraints = project.requirements.inverse || 'No specific constraints or exclusions have been documented.';
-    yPos = addSectionContent(constraints);
+    if (srsData.constraints?.length > 0) {
+      yPos = addBulletList(srsData.constraints);
+    } else {
+      yPos = addWrappedText('No specific constraints documented.', yPos);
+    }
 
     // ===== FOOTER ON ALL PAGES =====
     const pageCount = doc.getNumberOfPages();
@@ -366,10 +427,8 @@ export const AdminDashboard = ({ onLogout }: AdminDashboardProps) => {
       doc.setTextColor(150, 150, 150);
       
       if (i === 1) {
-        // Title page - just add bottom text
         doc.text('Generated by Requira', pageWidth / 2, pageHeight - 15, { align: 'center' });
       } else {
-        // Regular pages - add page number
         doc.text(
           `Software Requirements Specification - ${project.projectTitle} | Page ${i - 1} of ${pageCount - 1}`,
           pageWidth / 2,
@@ -379,9 +438,67 @@ export const AdminDashboard = ({ onLogout }: AdminDashboardProps) => {
       }
     }
 
-    // Save
     const fileName = `SRS_${project.projectTitle.replace(/[^a-z0-9]/gi, '_')}.pdf`;
     doc.save(fileName);
+  };
+
+  const handleExportPDF = async (project: Project) => {
+    setIsExportLoading(true);
+    
+    try {
+      toast({
+        title: "Generating SRS Document",
+        description: "AI is organizing your requirements into the SRS format...",
+      });
+
+      const { data, error } = await supabase.functions.invoke('format-srs', {
+        body: {
+          projectTitle: project.projectTitle,
+          projectDescription: project.projectDescription,
+          requirements: project.requirements,
+          clientName: project.clientName,
+          companyName: project.companyName
+        }
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      if (data.srsData) {
+        generatePDFFromSRS(project, data.srsData);
+        toast({
+          title: "Success",
+          description: "SRS document has been generated and downloaded.",
+        });
+      } else {
+        throw new Error('No SRS data returned');
+      }
+    } catch (error: any) {
+      console.error('Error exporting PDF:', error);
+      
+      if (error.message?.includes('429') || error.status === 429) {
+        toast({
+          title: "Rate Limited",
+          description: "Too many requests. Please wait a moment and try again.",
+          variant: "destructive"
+        });
+      } else if (error.message?.includes('402') || error.status === 402) {
+        toast({
+          title: "Credits Exhausted",
+          description: "AI credits have been exhausted. Please add more credits.",
+          variant: "destructive"
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to generate SRS document. Please try again.",
+          variant: "destructive"
+        });
+      }
+    } finally {
+      setIsExportLoading(false);
+    }
   };
 
   return (
@@ -519,12 +636,17 @@ export const AdminDashboard = ({ onLogout }: AdminDashboardProps) => {
               </h3>
               <div className="flex flex-wrap gap-3">
                 <Button 
-                  onClick={() => exportToPDF(selectedProject)}
+                  onClick={() => handleExportPDF(selectedProject)}
+                  disabled={isExportLoading}
                   variant="outline"
                   className="border-primary text-primary hover:bg-primary hover:text-primary-foreground"
                 >
-                  <Download className="w-4 h-4 mr-2" />
-                  Export PDF
+                  {isExportLoading ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Download className="w-4 h-4 mr-2" />
+                  )}
+                  {isExportLoading ? 'Generating...' : 'Export SRS PDF'}
                 </Button>
                 <Button 
                   onClick={handleCritique}
