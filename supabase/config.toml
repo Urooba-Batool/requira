@@ -5,3 +5,6 @@ verify_jwt = true
 
 [functions.requirement-critique]
 verify_jwt = true
+
+[functions.format-srs]
+verify_jwt = true
