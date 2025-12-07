@@ -162,7 +162,7 @@ export const RequirementChat = ({ project, clientName, onUpdateRequirements, onU
   };
 
   const handleSubmit = async () => {
-    await onUpdateStatus(project.id, 'under review');
+    await onUpdateStatus(project.id, 'completed');
   };
 
   return (
@@ -234,29 +234,40 @@ export const RequirementChat = ({ project, clientName, onUpdateRequirements, onU
 
       {/* Input Area */}
       {isChatActive ? (
-        <form onSubmit={handleSend} className="p-4 border-t border-border bg-muted/30">
-          <div className="flex gap-2">
-            <Input
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              placeholder="Type your response..."
-              disabled={isLoading}
-              className="flex-1"
-            />
-            <Button type="submit" disabled={isLoading || !message.trim()}>
-              <Send className="w-4 h-4" />
-            </Button>
-            <Button
-              type="button"
-              onClick={handleSubmit}
-              disabled={!isReadyToSubmit}
-              className={isReadyToSubmit ? 'gradient-secondary text-secondary-foreground' : ''}
-            >
-              <Check className="w-4 h-4 mr-1" />
-              Submit
-            </Button>
-          </div>
-        </form>
+        <div className="border-t border-border bg-muted/30">
+          {isReadyToSubmit && (
+            <div className="px-4 pt-3 pb-2">
+              <div className="bg-success/10 border border-success/30 rounded-lg p-3 text-center">
+                <p className="text-sm text-success font-medium">
+                  ✓ You've provided enough requirements. When you're done, click <strong>Submit Requirements</strong> below to complete your session.
+                </p>
+              </div>
+            </div>
+          )}
+          <form onSubmit={handleSend} className="p-4 pt-2">
+            <div className="flex gap-2">
+              <Input
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                placeholder="Type your response..."
+                disabled={isLoading}
+                className="flex-1"
+              />
+              <Button type="submit" disabled={isLoading || !message.trim()}>
+                <Send className="w-4 h-4" />
+              </Button>
+              <Button
+                type="button"
+                onClick={handleSubmit}
+                disabled={!isReadyToSubmit}
+                className={isReadyToSubmit ? 'gradient-secondary text-secondary-foreground' : ''}
+              >
+                <Check className="w-4 h-4 mr-1" />
+                Submit Requirements
+              </Button>
+            </div>
+          </form>
+        </div>
       ) : (
         <div className="p-4 border-t border-border bg-muted/50 text-center">
           <p className="text-muted-foreground font-medium">
