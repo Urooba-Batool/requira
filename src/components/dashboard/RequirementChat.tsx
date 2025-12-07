@@ -271,7 +271,7 @@ export const RequirementChat = ({ project, clientName, onUpdateRequirements, onU
       ) : (
         <div className="p-4 border-t border-border bg-muted/50 text-center">
           <p className="text-muted-foreground font-medium">
-            This project is <span className="text-primary">{project.status}</span>
+            The requirement session is complete for this project
           </p>
         </div>
       )}
