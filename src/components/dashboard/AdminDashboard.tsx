@@ -113,100 +113,274 @@ export const AdminDashboard = ({ onLogout }: AdminDashboardProps) => {
   const exportToPDF = (project: Project) => {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
     const margin = 20;
     const maxWidth = pageWidth - margin * 2;
     let yPos = 20;
 
-    // Helper to add text with word wrap
-    const addWrappedText = (text: string, y: number, fontSize: number = 11) => {
+    // Helper to add text with word wrap and check for page break
+    const addWrappedText = (text: string, y: number, fontSize: number = 11): number => {
       doc.setFontSize(fontSize);
       const lines = doc.splitTextToSize(text, maxWidth);
-      doc.text(lines, margin, y);
-      return y + (lines.length * fontSize * 0.4) + 5;
+      const lineHeight = fontSize * 0.5;
+      
+      lines.forEach((line: string) => {
+        if (y > pageHeight - 30) {
+          doc.addPage();
+          y = 20;
+        }
+        doc.text(line, margin, y);
+        y += lineHeight;
+      });
+      
+      return y + 5;
     };
 
-    // Header
-    doc.setFillColor(79, 70, 229); // Primary color
-    doc.rect(0, 0, pageWidth, 40, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(22);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Requirements Document', margin, 25);
-
-    // Project Info
-    yPos = 55;
-    doc.setTextColor(0, 0, 0);
-    doc.setFontSize(18);
-    doc.setFont('helvetica', 'bold');
-    doc.text(project.projectTitle, margin, yPos);
-    
-    yPos += 10;
-    doc.setFontSize(11);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(100, 100, 100);
-    doc.text(`Client: ${project.clientName} | Company: ${project.companyName}`, margin, yPos);
-    
-    yPos += 6;
-    doc.text(`Status: ${project.status.toUpperCase()}`, margin, yPos);
-    
-    yPos += 6;
-    doc.text(`Generated: ${new Date().toLocaleDateString()}`, margin, yPos);
-
-    // Divider
-    yPos += 10;
-    doc.setDrawColor(200, 200, 200);
-    doc.line(margin, yPos, pageWidth - margin, yPos);
-    yPos += 15;
-
-    // Requirements sections
-    const sections = [
-      { title: 'Functional Requirements', content: project.requirements.functional },
-      { title: 'Non-Functional Requirements', content: project.requirements.nonFunctional },
-      { title: 'Domain Requirements', content: project.requirements.domain },
-      { title: 'Constraints & Exclusions', content: project.requirements.inverse },
-    ];
-
-    doc.setTextColor(0, 0, 0);
-    
-    sections.forEach(section => {
-      // Check if we need a new page
-      if (yPos > 250) {
+    // Helper to check and add new page if needed
+    const checkPageBreak = (requiredSpace: number): number => {
+      if (yPos + requiredSpace > pageHeight - 30) {
         doc.addPage();
-        yPos = 20;
+        return 20;
       }
+      return yPos;
+    };
 
-      // Section title
-      doc.setFontSize(14);
+    // Helper to add section header
+    const addSectionHeader = (number: string, title: string, isSubsection: boolean = false): number => {
+      yPos = checkPageBreak(15);
+      const fontSize = isSubsection ? 12 : 14;
+      doc.setFontSize(fontSize);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(79, 70, 229);
-      doc.text(section.title, margin, yPos);
-      yPos += 8;
+      doc.text(`${number} ${title}`, margin, yPos);
+      return yPos + (isSubsection ? 8 : 10);
+    };
 
-      // Section content
+    // Helper to add section content
+    const addSectionContent = (content: string): number => {
       doc.setFontSize(11);
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(60, 60, 60);
-      const content = section.content || 'No requirements documented for this category.';
-      yPos = addWrappedText(content, yPos);
-      yPos += 10;
+      return addWrappedText(content || 'Not specified.', yPos);
+    };
+
+    // ===== TITLE PAGE =====
+    doc.setFillColor(79, 70, 229);
+    doc.rect(0, 0, pageWidth, pageHeight, 'F');
+    
+    // Title
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(28);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Software Requirements', pageWidth / 2, pageHeight / 2 - 30, { align: 'center' });
+    doc.text('Specification (SRS)', pageWidth / 2, pageHeight / 2 - 10, { align: 'center' });
+    
+    // Project Title
+    doc.setFontSize(18);
+    doc.setFont('helvetica', 'normal');
+    doc.text(project.projectTitle, pageWidth / 2, pageHeight / 2 + 20, { align: 'center' });
+    
+    // Metadata
+    doc.setFontSize(12);
+    doc.text(`Client: ${project.clientName}`, pageWidth / 2, pageHeight / 2 + 45, { align: 'center' });
+    doc.text(`Company: ${project.companyName}`, pageWidth / 2, pageHeight / 2 + 57, { align: 'center' });
+    doc.text(`Date: ${new Date().toLocaleDateString()}`, pageWidth / 2, pageHeight / 2 + 69, { align: 'center' });
+    doc.text(`Version: 1.0`, pageWidth / 2, pageHeight / 2 + 81, { align: 'center' });
+
+    // ===== SECTION 1: INTRODUCTION =====
+    doc.addPage();
+    yPos = 20;
+    
+    yPos = addSectionHeader('1.', 'Introduction');
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(60, 60, 60);
+    yPos = addWrappedText(
+      'This Software Requirements Specification (SRS) provides a detailed description of the system, its purpose, scope, and the features it will include.',
+      yPos
+    );
+    yPos += 5;
+
+    // 1.1 Purpose
+    yPos = addSectionHeader('1.1', 'Purpose', true);
+    yPos = addWrappedText(
+      `The purpose of this document is to outline the functional and non-functional requirements for ${project.projectTitle}. ${project.projectDescription || ''}`,
+      yPos
+    );
+    yPos += 5;
+
+    // 1.2 Scope
+    yPos = addSectionHeader('1.2', 'Scope', true);
+    yPos = addWrappedText(
+      `This system will allow users to perform essential tasks as defined by ${project.companyName}. The requirements documented herein are based on client discussions and stakeholder input.`,
+      yPos
+    );
+    yPos += 10;
+
+    // ===== SECTION 2: OVERALL DESCRIPTION =====
+    yPos = checkPageBreak(40);
+    yPos = addSectionHeader('2.', 'Overall Description');
+    yPos = addWrappedText(
+      'This section describes the product\'s perspective, major functions, users, and general constraints.',
+      yPos
+    );
+    yPos += 5;
+
+    // 2.1 Product Perspective
+    yPos = addSectionHeader('2.1', 'Product Perspective', true);
+    const domainContent = project.requirements.domain || 'The product operates as a standalone system designed to meet the specific needs outlined by the client.';
+    yPos = addWrappedText(domainContent, yPos);
+    yPos += 5;
+
+    // 2.2 User Characteristics
+    yPos = addSectionHeader('2.2', 'User Characteristics', true);
+    yPos = addWrappedText(
+      'Users of this system are expected to have varying levels of technical expertise. The system should be designed with usability in mind to accommodate all user types.',
+      yPos
+    );
+    yPos += 10;
+
+    // ===== SECTION 3: SYSTEM FEATURES (FUNCTIONAL REQUIREMENTS) =====
+    yPos = checkPageBreak(40);
+    yPos = addSectionHeader('3.', 'System Features');
+    yPos = addWrappedText(
+      'This section outlines the key functional features of the system based on client requirements.',
+      yPos
+    );
+    yPos += 5;
+
+    // Parse functional requirements and display them
+    const functionalReqs = project.requirements.functional || 'No functional requirements have been specified.';
+    const funcLines = functionalReqs.split('\n').filter((line: string) => line.trim());
+    
+    if (funcLines.length > 0) {
+      funcLines.forEach((line: string, index: number) => {
+        yPos = checkPageBreak(20);
+        yPos = addSectionHeader(`3.${index + 1}`, `Feature ${index + 1}`, true);
+        yPos = addWrappedText(line.replace(/^[-•*]\s*/, ''), yPos);
+        yPos += 3;
+      });
+    } else {
+      yPos = addSectionContent(functionalReqs);
+    }
+    yPos += 10;
+
+    // ===== SECTION 4: NON-FUNCTIONAL REQUIREMENTS =====
+    yPos = checkPageBreak(40);
+    yPos = addSectionHeader('4.', 'Non-Functional Requirements');
+    yPos = addWrappedText(
+      'Requirements regarding performance, security, usability, reliability, and other quality attributes.',
+      yPos
+    );
+    yPos += 5;
+
+    // Parse non-functional requirements
+    const nonFuncReqs = project.requirements.nonFunctional || 'No non-functional requirements have been specified.';
+    const nonFuncLines = nonFuncReqs.split('\n').filter((line: string) => line.trim());
+
+    const nfCategories = [
+      { title: 'Performance Requirements', keywords: ['performance', 'speed', 'response', 'load', 'fast'] },
+      { title: 'Security Requirements', keywords: ['security', 'auth', 'password', 'encrypt', 'protect', 'access'] },
+      { title: 'Usability Requirements', keywords: ['usability', 'user-friendly', 'intuitive', 'easy', 'simple'] },
+      { title: 'Reliability Requirements', keywords: ['reliable', 'uptime', 'availability', 'backup', 'recovery'] }
+    ];
+
+    let categorizedLines: { [key: string]: string[] } = {};
+    let uncategorized: string[] = [];
+
+    nonFuncLines.forEach((line: string) => {
+      const lowerLine = line.toLowerCase();
+      let matched = false;
+      for (const cat of nfCategories) {
+        if (cat.keywords.some(kw => lowerLine.includes(kw))) {
+          if (!categorizedLines[cat.title]) categorizedLines[cat.title] = [];
+          categorizedLines[cat.title].push(line.replace(/^[-•*]\s*/, ''));
+          matched = true;
+          break;
+        }
+      }
+      if (!matched) {
+        uncategorized.push(line.replace(/^[-•*]\s*/, ''));
+      }
     });
 
-    // Footer
+    let nfSubIndex = 1;
+    Object.entries(categorizedLines).forEach(([category, lines]) => {
+      yPos = checkPageBreak(20);
+      yPos = addSectionHeader(`4.${nfSubIndex}`, category, true);
+      lines.forEach(line => {
+        yPos = addWrappedText(`• ${line}`, yPos);
+      });
+      yPos += 3;
+      nfSubIndex++;
+    });
+
+    if (uncategorized.length > 0) {
+      yPos = checkPageBreak(20);
+      yPos = addSectionHeader(`4.${nfSubIndex}`, 'Other Non-Functional Requirements', true);
+      uncategorized.forEach(line => {
+        yPos = addWrappedText(`• ${line}`, yPos);
+      });
+      yPos += 3;
+    }
+
+    if (nonFuncLines.length === 0) {
+      yPos = addSectionContent(nonFuncReqs);
+    }
+    yPos += 10;
+
+    // ===== SECTION 5: EXTERNAL INTERFACE REQUIREMENTS =====
+    yPos = checkPageBreak(40);
+    yPos = addSectionHeader('5.', 'External Interface Requirements');
+    yPos = addWrappedText(
+      'Details about user interface, hardware, software, and communication interfaces required by the system.',
+      yPos
+    );
+    yPos += 5;
+
+    // Extract interface-related requirements from domain if available
+    yPos = addSectionHeader('5.1', 'User Interface Requirements', true);
+    yPos = addWrappedText(
+      'The system shall provide an intuitive user interface that adheres to modern design principles and accessibility standards.',
+      yPos
+    );
+    yPos += 10;
+
+    // ===== SECTION 6: CONSTRAINTS & OTHER REQUIREMENTS =====
+    yPos = checkPageBreak(40);
+    yPos = addSectionHeader('6.', 'Constraints & Other Requirements');
+    yPos = addWrappedText(
+      'This section documents any additional constraints, exclusions, or specifications for the project.',
+      yPos
+    );
+    yPos += 5;
+
+    const constraints = project.requirements.inverse || 'No specific constraints or exclusions have been documented.';
+    yPos = addSectionContent(constraints);
+
+    // ===== FOOTER ON ALL PAGES =====
     const pageCount = doc.getNumberOfPages();
     for (let i = 1; i <= pageCount; i++) {
       doc.setPage(i);
       doc.setFontSize(9);
       doc.setTextColor(150, 150, 150);
-      doc.text(
-        `Generated by Requira | Page ${i} of ${pageCount}`,
-        pageWidth / 2,
-        doc.internal.pageSize.getHeight() - 10,
-        { align: 'center' }
-      );
+      
+      if (i === 1) {
+        // Title page - just add bottom text
+        doc.text('Generated by Requira', pageWidth / 2, pageHeight - 15, { align: 'center' });
+      } else {
+        // Regular pages - add page number
+        doc.text(
+          `Software Requirements Specification - ${project.projectTitle} | Page ${i - 1} of ${pageCount - 1}`,
+          pageWidth / 2,
+          pageHeight - 10,
+          { align: 'center' }
+        );
+      }
     }
 
     // Save
-    const fileName = `${project.projectTitle.replace(/[^a-z0-9]/gi, '_')}_requirements.pdf`;
+    const fileName = `SRS_${project.projectTitle.replace(/[^a-z0-9]/gi, '_')}.pdf`;
     doc.save(fileName);
   };
 
