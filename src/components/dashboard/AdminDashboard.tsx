@@ -670,6 +670,33 @@ export const AdminDashboard = ({ onLogout }: AdminDashboardProps) => {
               )}
             </div>
 
+            {/* Suggested Names (if any) */}
+            {selectedProject.suggestedNames && selectedProject.suggestedNames.length > 0 && (
+              <div className="bg-secondary/10 border border-secondary/20 rounded-xl p-4">
+                <h4 className="flex items-center gap-2 font-semibold text-foreground mb-3">
+                  <Sparkles className="w-4 h-4 text-secondary" />
+                  AI-Suggested Project Names
+                </h4>
+                <div className="flex flex-wrap gap-2">
+                  {selectedProject.suggestedNames.map((name, idx) => (
+                    <span
+                      key={idx}
+                      className={`px-3 py-1.5 text-sm rounded-full ${
+                        name === selectedProject.projectTitle
+                          ? 'gradient-secondary text-secondary-foreground'
+                          : 'bg-muted text-muted-foreground'
+                      }`}
+                    >
+                      {name}
+                      {name === selectedProject.projectTitle && (
+                        <Check className="w-3 h-3 ml-1 inline" />
+                      )}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Requirements */}
             <div className="grid md:grid-cols-2 gap-4">
               {requirementCategories.map(cat => (

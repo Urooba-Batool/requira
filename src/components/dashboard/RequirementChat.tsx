@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Send, Check, Loader2, Bot, User } from 'lucide-react';
+import { Send, Check, Loader2, Bot, User, Sparkles, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Project, ChatMessage, Requirements, ProjectStatus } from '@/types/requira';
@@ -12,14 +12,19 @@ interface RequirementChatProps {
   clientName: string;
   onUpdateRequirements: (id: string, requirements: Requirements, history: ChatMessage[]) => Promise<void>;
   onUpdateStatus: (id: string, status: ProjectStatus) => Promise<void>;
+  onUpdateProject?: (id: string, updates: Partial<Project>) => Promise<void>;
 }
 
-export const RequirementChat = ({ project, clientName, onUpdateRequirements, onUpdateStatus }: RequirementChatProps) => {
+export const RequirementChat = ({ project, clientName, onUpdateRequirements, onUpdateStatus, onUpdateProject }: RequirementChatProps) => {
   const [message, setMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [history, setHistory] = useState<ChatMessage[]>(project.history);
   const [isReadyToSubmit, setIsReadyToSubmit] = useState(false);
   const [requirements, setRequirements] = useState<Requirements>(project.requirements);
+  const [suggestedNames, setSuggestedNames] = useState<string[]>(project.suggestedNames || []);
+  const [selectedName, setSelectedName] = useState<string>(project.projectTitle);
+  const [isGeneratingNames, setIsGeneratingNames] = useState(false);
+  const [showNameSuggestions, setShowNameSuggestions] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
@@ -33,7 +38,10 @@ export const RequirementChat = ({ project, clientName, onUpdateRequirements, onU
   useEffect(() => {
     setHistory(project.history);
     setRequirements(project.requirements);
-  }, [project.id, project.history, project.requirements]);
+    if (project.suggestedNames && project.suggestedNames.length > 0) {
+      setSuggestedNames(project.suggestedNames);
+    }
+  }, [project.id, project.history, project.requirements, project.suggestedNames]);
 
   // Initialize chat with welcome message if empty
   useEffect(() => {
@@ -161,7 +169,65 @@ export const RequirementChat = ({ project, clientName, onUpdateRequirements, onU
     }
   };
 
+  const generateNameSuggestions = async () => {
+    setIsGeneratingNames(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('suggest-project-names', {
+        body: {
+          projectTitle: project.projectTitle,
+          requirements,
+          conversationHistory: history
+        }
+      });
+
+      if (error) throw error;
+
+      if (data.suggestions && Array.isArray(data.suggestions)) {
+        setSuggestedNames(data.suggestions);
+        setShowNameSuggestions(true);
+        
+        // Save suggestions to database
+        if (onUpdateProject) {
+          await onUpdateProject(project.id, { suggestedNames: data.suggestions });
+        }
+        
+        toast({
+          title: "Name Suggestions Ready",
+          description: "AI has generated project name suggestions based on your requirements.",
+        });
+      }
+    } catch (error: any) {
+      console.error('Error generating name suggestions:', error);
+      
+      if (error.message?.includes('429') || error.status === 429) {
+        toast({
+          title: "Rate Limited",
+          description: "Too many requests. Please wait a moment and try again.",
+          variant: "destructive"
+        });
+      } else if (error.message?.includes('402') || error.status === 402) {
+        toast({
+          title: "Credits Exhausted",
+          description: "AI credits have been exhausted. Please add more credits.",
+          variant: "destructive"
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to generate name suggestions. Please try again.",
+          variant: "destructive"
+        });
+      }
+    } finally {
+      setIsGeneratingNames(false);
+    }
+  };
+
   const handleSubmit = async () => {
+    // Update project title if a different name was selected
+    if (selectedName !== project.projectTitle && onUpdateProject) {
+      await onUpdateProject(project.id, { projectTitle: selectedName });
+    }
     await onUpdateStatus(project.id, 'completed');
   };
 
@@ -236,26 +302,105 @@ export const RequirementChat = ({ project, clientName, onUpdateRequirements, onU
       {isChatActive ? (
         <div className="border-t border-border bg-muted/30">
           {isReadyToSubmit && (
-            <div className="px-4 pt-3 pb-2">
+            <div className="px-4 pt-3 pb-2 space-y-3">
               <div className="bg-success/10 border border-success/30 rounded-lg p-3 text-center">
                 <p className="text-sm text-success font-medium">
-                  ✓ You've provided enough requirements. When you're done, click <strong>Submit Requirements</strong> below to complete your session.
+                  ✓ You've provided enough requirements. You can now get AI-suggested project names or submit directly.
                 </p>
               </div>
+              
+              {/* Name Suggestions Section */}
+              {showNameSuggestions && suggestedNames.length > 0 && (
+                <motion.div 
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  className="bg-primary/5 border border-primary/20 rounded-lg p-4"
+                >
+                  <div className="flex items-center gap-2 mb-3">
+                    <Sparkles className="w-4 h-4 text-primary" />
+                    <h4 className="font-semibold text-foreground">Suggested Project Names</h4>
+                  </div>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    Select a name or keep your original title
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => setSelectedName(project.projectTitle)}
+                      className={`px-3 py-2 text-sm rounded-lg transition-all ${
+                        selectedName === project.projectTitle
+                          ? 'gradient-primary text-primary-foreground shadow-md'
+                          : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                      }`}
+                    >
+                      {project.projectTitle} (Original)
+                    </button>
+                    {suggestedNames.map((name, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => setSelectedName(name)}
+                        className={`px-3 py-2 text-sm rounded-lg transition-all ${
+                          selectedName === name
+                            ? 'gradient-secondary text-secondary-foreground shadow-md'
+                            : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                        }`}
+                      >
+                        {name}
+                      </button>
+                    ))}
+                  </div>
+                  {selectedName !== project.projectTitle && (
+                    <p className="text-xs text-primary mt-2">
+                      Selected: <strong>{selectedName}</strong>
+                    </p>
+                  )}
+                </motion.div>
+              )}
             </div>
           )}
           <form onSubmit={handleSend} className="p-4 pt-2">
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
               <Input
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 placeholder="Type your response..."
                 disabled={isLoading}
-                className="flex-1"
+                className="flex-1 min-w-[200px]"
               />
               <Button type="submit" disabled={isLoading || !message.trim()}>
                 <Send className="w-4 h-4" />
               </Button>
+              {isReadyToSubmit && !showNameSuggestions && (
+                <Button
+                  type="button"
+                  onClick={generateNameSuggestions}
+                  disabled={isGeneratingNames}
+                  variant="outline"
+                  className="border-primary text-primary hover:bg-primary hover:text-primary-foreground"
+                >
+                  {isGeneratingNames ? (
+                    <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                  ) : (
+                    <Sparkles className="w-4 h-4 mr-1" />
+                  )}
+                  Suggest Names
+                </Button>
+              )}
+              {isReadyToSubmit && showNameSuggestions && (
+                <Button
+                  type="button"
+                  onClick={generateNameSuggestions}
+                  disabled={isGeneratingNames}
+                  variant="outline"
+                  size="icon"
+                  title="Regenerate suggestions"
+                >
+                  {isGeneratingNames ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <RefreshCw className="w-4 h-4" />
+                  )}
+                </Button>
+              )}
               <Button
                 type="button"
                 onClick={handleSubmit}

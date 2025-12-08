@@ -39,7 +39,7 @@ const getStatusInfo = (status: ProjectStatus) => {
 };
 
 export const ClientDashboard = ({ clientMeta, onLogout }: ClientDashboardProps) => {
-  const { projects, isLoading, addProject, updateProjectRequirements, updateProjectStatus } = useProjects();
+  const { projects, isLoading, addProject, updateProject, updateProjectRequirements, updateProjectStatus } = useProjects();
   const { userId } = useAuth();
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
@@ -177,6 +177,7 @@ export const ClientDashboard = ({ clientMeta, onLogout }: ClientDashboardProps) 
             clientName={clientMeta.name}
             onUpdateRequirements={updateProjectRequirements}
             onUpdateStatus={updateProjectStatus}
+            onUpdateProject={updateProject}
           />
         ) : (
           <div className="flex flex-col items-center justify-center h-full">
