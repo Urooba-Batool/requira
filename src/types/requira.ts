@@ -31,6 +31,7 @@ export interface Project {
   requirements: Requirements;
   history: ChatMessage[];
   adminId?: string;
+  suggestedNames?: string[];
 }
 
 export interface ClientMeta {

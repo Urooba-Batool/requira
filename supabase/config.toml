@@ -1,5 +1,12 @@
 project_id = "eqvvvshjixdkekodxwnk"
 
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
 [functions.requirement-chat]
 verify_jwt = true
 
@@ -7,4 +14,7 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.format-srs]
+verify_jwt = true
+
+[functions.suggest-project-names]
 verify_jwt = true

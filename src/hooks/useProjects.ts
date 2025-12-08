@@ -17,6 +17,7 @@ interface DbProject {
   created_at: string;
   updated_at: string;
   submitted_at: string | null;
+  suggested_names: string[] | null;
 }
 
 interface DbProfile {
@@ -38,6 +39,7 @@ const mapDbToProject = (dbProject: DbProject, profile?: DbProfile): Project => (
   requirements: (dbProject.requirements || {}) as unknown as Requirements,
   history: (Array.isArray(dbProject.history) ? dbProject.history : []) as unknown as ChatMessage[],
   adminId: dbProject.admin_id || undefined,
+  suggestedNames: dbProject.suggested_names || undefined,
 });
 
 export const useProjects = () => {
@@ -148,6 +150,7 @@ export const useProjects = () => {
       if (updates.history) dbUpdates.history = updates.history;
       if (updates.submittedAt) dbUpdates.submitted_at = updates.submittedAt.toISOString();
       if (updates.adminId) dbUpdates.admin_id = updates.adminId;
+      if (updates.suggestedNames) dbUpdates.suggested_names = updates.suggestedNames;
 
       const { error } = await supabase
         .from('projects')

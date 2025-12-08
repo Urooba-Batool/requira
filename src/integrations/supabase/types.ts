@@ -56,6 +56,7 @@ export type Database = {
           requirements: Json
           status: Database["public"]["Enums"]["project_status"]
           submitted_at: string | null
+          suggested_names: string[] | null
           updated_at: string
         }
         Insert: {
@@ -69,6 +70,7 @@ export type Database = {
           requirements?: Json
           status?: Database["public"]["Enums"]["project_status"]
           submitted_at?: string | null
+          suggested_names?: string[] | null
           updated_at?: string
         }
         Update: {
@@ -82,6 +84,7 @@ export type Database = {
           requirements?: Json
           status?: Database["public"]["Enums"]["project_status"]
           submitted_at?: string | null
+          suggested_names?: string[] | null
           updated_at?: string
         }
         Relationships: []
