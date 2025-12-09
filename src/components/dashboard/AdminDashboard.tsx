@@ -22,6 +22,7 @@ import { useProjects } from '@/hooks/useProjects';
 import { Project, ProjectStatus } from '@/types/requira';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { CritiqueDisplay } from './CritiqueDisplay';
 
 interface AdminDashboardProps {
   onLogout: () => void;
@@ -662,10 +663,8 @@ export const AdminDashboard = ({ onLogout }: AdminDashboardProps) => {
                 </Button>
               </div>
               {critiqueResult && (
-                <div className="mt-4 p-4 bg-card border border-border rounded-lg">
-                  <pre className="whitespace-pre-wrap text-sm text-foreground font-sans">
-                    {critiqueResult}
-                  </pre>
+                <div className="mt-4 p-5 bg-card border border-border rounded-lg">
+                  <CritiqueDisplay critique={critiqueResult} />
                 </div>
               )}
             </div>
